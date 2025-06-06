@@ -1,0 +1,77 @@
+# 워크플로우 이름: GitHub Actions 탭에 보여지는 이름
+name: PR to Develop CI
+
+# 워크플로우 트리거 조건 정의
+on:
+  # PR이 생성되거나 업데이트될 때
+  pull_request:
+    branches:
+      - develop # PR 대상 브랜치가 develop일 때만 실행됨
+    paths-ignore:
+      - '**.md' # 변경된 파일이 .md 문서 파일뿐일 경우에는 무시하고 실행하지 않음
+
+# 이 워크플로우가 PR에 대한 체크를 작성할 수 있도록 권한 설정
+permissions:
+  contents: read # PR의 소스 브랜치 코드를 읽을 수 있는 권한
+  checks: write # PR 체크 결과를 작성할 수 있는 권한
+  pull-requests: write # PR에 댓글을 작성할 수 있는 권한
+
+# 워크플로우 실행 환경 정의
+jobs:
+  # 워크플로우 내의 job 이름 (마음대로 지어도 됨)
+  build-and-test:
+    # 조건: PR의 소스 브랜치가 'feature/'로 시작할 때만 이 job을 실행함
+    if: startsWith(github.head_ref, 'feature/')
+
+    # GitHub가 제공하는 가상 머신 환경 (Ubuntu 최신 버전 사용)
+    runs-on: ubuntu-latest
+
+    # job이 실행될 때 수행할 단계들 정의
+    steps:
+      # 1단계 - 체크아웃: PR의 소스 브랜치 코드를 가져옴
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2단계 - Java 17 설치 (OpenJDK 17)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4 # GitHub 공식 액션으로 Java 설치
+        with:
+          java-version: '17'
+          distribution: 'temurin' # 안정적인 OpenJDK 배포판
+
+      # 3단계 - Gradle 캐시 설정 (빌드 속도 향상)
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v3 # 캐시 액션 사용
+        with:
+          # 캐시할 디렉토리 설정: Gradle 관련 캐시 디렉토리
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          # 캐시 키 설정: Gradle 관련 파일이 변경될 때마다 캐시를 새로 만듦
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          # 이전 캐시 키로부터 복원 가능
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # 4단계 - gradlew 실행 권한 부여
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew # gradlew 스크립트에 실행 권한 부여
+      
+      # 5단계 - Gradle 빌드 및 테스트 실행
+      - name: Build and test with Gradle
+        run: ./gradlew build # Gradle 빌드 및 테스트 실행 (--info 로그는 PR 코멘트에서 확인)
+
+      # 6단계 - 테스트 결과를 PR에 요약 댓글로 등록
+      - name: Post test results as a comment
+        uses: EnricoMi/publish-unit-test-result-action@v2 # 테스트 결과를 PR에 댓글로 남기는 액션 사용
+        # 항상 실행 (성공/실패 상관없이)
+        if: always()
+        with:
+          files: '**/build/test-results/test/TEST-*.xml' # 테스트 결과 XML 파일 경로
+
+      - name: Reports JUnit test results as GitHub pull request check
+        uses: mikepenz/action-junit-report@v5 # JUnit 테스트 결과를 GitHub PR 체크로 보고하는 액션 사용
+        # 실패 시 실행
+        if: failure()
+        with:
+          report_paths: '**/build/test-results/test/TEST-*.xml' # JUnit 테스트 결과 XML 파일 경로
