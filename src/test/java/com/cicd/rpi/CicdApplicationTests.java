@@ -10,4 +10,8 @@ class CicdApplicationTests {
 	void contextLoads() {
 	}
 
+	@Test
+	void simpleTest() {
+
+	}
 }
