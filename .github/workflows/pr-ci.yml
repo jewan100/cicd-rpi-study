@@ -1,5 +1,5 @@
 # 워크플로우 이름: GitHub Actions 탭에 보여지는 이름
-name: PR to Develop CI
+name: Pull Request CI (develop/main)
 
 # 워크플로우 트리거 조건 정의
 on:
@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - develop # PR 대상 브랜치가 develop일 때만 실행됨
+      - main # PR 대상 브랜치가 main일 때도 실행됨
     paths-ignore:
       - '**.md' # 변경된 파일이 .md 문서 파일뿐일 경우에는 무시하고 실행하지 않음
 
@@ -21,7 +22,8 @@ jobs:
   # 워크플로우 내의 job 이름 (마음대로 지어도 됨)
   build-and-test:
     # 조건: PR의 소스 브랜치가 'feature/'로 시작할 때만 이 job을 실행함
-    if: startsWith(github.head_ref, 'feature/')
+    # if: startsWith(github.head_ref, 'feature/')
+    # 해당 조건은 주석 처리되어 있지만, 필요시 활성화할 수 있음
 
     # GitHub가 제공하는 가상 머신 환경 (Ubuntu 최신 버전 사용)
     runs-on: ubuntu-latest

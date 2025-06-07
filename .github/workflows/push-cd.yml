@@ -1,0 +1,70 @@
+# 워크플로우 이름: GitHub Actions 탭에 보여지는 이름
+name: PUSH CD (main)
+
+# 워크플로우 트리거 조건 정의
+on:
+  # main 브랜치에 푸시될 때
+  push:
+    branches:
+      - main # main 브랜치에 푸시될 때만 실행됨
+
+# 워크플로우 실행 환경 정의
+jobs:
+  # 워크플로우 내의 job 이름 (마음대로 지어도 됨)
+  build-and-deploy:
+    # GitHub가 제공하는 가상 머신 환경 (Ubuntu 최신 버전 사용)
+    runs-on: ubuntu-latest
+
+    # job이 실행될 때 수행할 단계들 정의
+    steps:
+      # 1단계 - 체크아웃: main 브랜치 코드를 가져옴
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2단계 - Java 17 설치 (OpenJDK 17)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4 # GitHub 공식 액션으로 Java 설치
+        with:
+          java-version: '17'
+          distribution: 'temurin' # 안정적인 OpenJDK 배포판
+
+      # 3단계 - Gradle 캐시 설정 (빌드 속도 향상)
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v3 # 캐시 액션 사용
+        with:
+          # 캐시할 디렉토리 설정: Gradle 관련 캐시 디렉토리
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          # 캐시 키 설정: Gradle 관련 파일이 변경될 때마다 캐시를 새로 만듦
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          # 이전 캐시 키로부터 복원 가능
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # 4단계 - gradlew 실행 권한 부여
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew # gradlew 스크립트에 실행 권한 부여
+    
+      # 5단계 - Gradle 빌드 및 테스트 실행
+      - name: Build with Gradle
+        run: ./gradlew build -x test # 테스트 제외하고 빌드 실행
+
+      # 6단계 - Docker 이미지 빌드
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/myapp:latest . # 현재 디렉토리에서 Dockerfile을 사용하여 이미지 빌드
+
+      # 7단계 - Docker Hub에 로그인 & 이미지 푸시
+      - name: Log in to Docker Hub
+        # Docker Hub에 로그인
+        # --password-stdin 옵션은 입력 스트림으로 비밀번호를 넘겨주는 방식 (보안에 유리)
+        # 빌드한 이미지를 Docker Hub에 푸시
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          docker push ${{ secrets.DOCKER_USERNAME }}/myapp:latest
+      
+      # 8단계 - Jenkins Webhook 호출 (배포 트리거)
+      - name: Trigger Jenkins deployment
+        # Jenkins에 배포 트리거 요청
+        run: |
+          curl -X POST "http://${{ secrets.JENKINS_HOST }}/job/${{ secrets.JENKINS_JOB_NAME }}/build?token=${{ secrets.JENKINS_TOKEN }}"
