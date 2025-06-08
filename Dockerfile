@@ -1,6 +1,6 @@
 # 베이스 이미지 설정: Java 17 JRE만 포함된 아주 가벼운 Linux 이미지 (Alpine 기반)
 # 이 이미지는 Spring Boot 실행에 필요한 최소한의 환경만 포함하고 있음
-FROM arm64v8/eclipse-temurin:17-jre
+FROM eclipse-temurin:17-jre
 
 # 컨테이너 안에서 작업할 디렉토리 설정 (기본 디렉토리)
 WORKDIR /app
